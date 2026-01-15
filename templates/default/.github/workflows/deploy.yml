@@ -43,8 +43,27 @@ jobs:
         with:
           node-version: 22
 
+      - name: Read CLI version
+        id: cli
+        run: |
+          set -euo pipefail
+          version="$(cat config/clawdlets-cli-version.txt)"
+          if [[ -z "${version}" ]]; then
+            echo "error: config/clawdlets-cli-version.txt is empty"
+            exit 1
+          fi
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
       - name: Install clawdlets CLI
-        run: npm install -g clawdlets
+        run: npm install -g clawdlets@${{ steps.cli.outputs.version }}
+
+      - uses: cachix/install-nix-action@4e002c8ec80594ecd40e759629461e26c8abed15 # v31.9.0
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Install minisign
+        run: nix profile install nixpkgs#minisign
 
       - name: Configure SSH
         run: |
@@ -88,10 +107,18 @@ jobs:
               continue
             fi
             manifest="deploy-manifest.${host}.json"
+            manifest_url=""
             if [[ -n "${REV_FILTER}" ]]; then
-              curl -fsSL --retry 3 --retry-delay 2 -o "${manifest}" "${pages_base}/deploy/${host}/${REV_FILTER}.json"
+              manifest_url="${pages_base}/deploy/${host}/${REV_FILTER}.json"
             else
-              curl -fsSL --retry 3 --retry-delay 2 -o "${manifest}" "${pages_base}/deploy/${host}/latest.json"
+              manifest_url="${pages_base}/deploy/${host}/latest.json"
             fi
-            clawdlets server deploy --host "${host}" --manifest "${manifest}" --ssh-tty false
+            curl -fsSL --retry 3 --retry-delay 2 -o "${manifest}" "${manifest_url}"
+            curl -fsSL --retry 3 --retry-delay 2 -o "${manifest}.minisig" "${manifest_url}.minisig"
+            clawdlets server deploy \
+              --host "${host}" \
+              --manifest "${manifest}" \
+              --manifest-signature "${manifest}.minisig" \
+              --manifest-public-key-file config/manifest.minisign.pub \
+              --ssh-tty false
           done

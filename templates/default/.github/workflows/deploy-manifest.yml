@@ -26,8 +26,19 @@ jobs:
         with:
           node-version: 22
 
+      - name: Read CLI version
+        id: cli
+        run: |
+          set -euo pipefail
+          version="$(cat config/clawdlets-cli-version.txt)"
+          if [[ -z "${version}" ]]; then
+            echo "error: config/clawdlets-cli-version.txt is empty"
+            exit 1
+          fi
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
       - name: Install clawdlets CLI
-        run: npm install -g clawdlets
+        run: npm install -g clawdlets@${{ steps.cli.outputs.version }}
 
       - uses: cachix/install-nix-action@4e002c8ec80594ecd40e759629461e26c8abed15 # v31.9.0
         with:
@@ -63,8 +74,8 @@ jobs:
         run: |
           set -euo pipefail
           if [[ -z "${MINISIGN_PRIVATE_KEY:-}" ]]; then
-            echo "warn: MINISIGN_PRIVATE_KEY not set; skipping manifest signing"
-            exit 0
+            echo "error: MINISIGN_PRIVATE_KEY not set"
+            exit 1
           fi
           key="${RUNNER_TEMP}/minisign.key"
           printf '%s' "${MINISIGN_PRIVATE_KEY}" > "${key}"
