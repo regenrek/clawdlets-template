@@ -77,41 +77,41 @@ in {
         set -euo pipefail
 
         tmpdir="$(mktemp -d)"
-        trap 'rm -rf "${tmpdir}"' EXIT
+        trap 'rm -rf "''${tmpdir}"' EXIT
 
-        manifest="${tmpdir}/manifest.json"
-        curl -fsSL --retry 3 --retry-delay 2 -o "${manifest}" "${CLAWDLETS_SELF_UPDATE_MANIFEST_URL}"
+        manifest="''${tmpdir}/manifest.json"
+        curl -fsSL --retry 3 --retry-delay 2 -o "''${manifest}" "''${CLAWDLETS_SELF_UPDATE_MANIFEST_URL}"
 
-        if [[ -n "${CLAWDLETS_SELF_UPDATE_PUBLIC_KEY:-}" ]]; then
-          sig="${tmpdir}/manifest.minisig"
-          if [[ -z "${CLAWDLETS_SELF_UPDATE_SIGNATURE_URL:-}" ]]; then
+        if [[ -n "''${CLAWDLETS_SELF_UPDATE_PUBLIC_KEY:-}" ]]; then
+          sig="''${tmpdir}/manifest.minisig"
+          if [[ -z "''${CLAWDLETS_SELF_UPDATE_SIGNATURE_URL:-}" ]]; then
             echo "error: signature URL missing" >&2
             exit 2
           fi
-          curl -fsSL --retry 3 --retry-delay 2 -o "${sig}" "${CLAWDLETS_SELF_UPDATE_SIGNATURE_URL}"
-          minisign -Vm "${manifest}" -P "${CLAWDLETS_SELF_UPDATE_PUBLIC_KEY}" -x "${sig}"
+          curl -fsSL --retry 3 --retry-delay 2 -o "''${sig}" "''${CLAWDLETS_SELF_UPDATE_SIGNATURE_URL}"
+          minisign -Vm "''${manifest}" -P "''${CLAWDLETS_SELF_UPDATE_PUBLIC_KEY}" -x "''${sig}"
         fi
 
-        host="$(jq -r '.host // empty' "${manifest}")"
-        rev="$(jq -r '.rev // empty' "${manifest}")"
-        toplevel="$(jq -r '.toplevel // empty' "${manifest}")"
+        host="$(jq -r '.host // empty' "''${manifest}")"
+        rev="$(jq -r '.rev // empty' "''${manifest}")"
+        toplevel="$(jq -r '.toplevel // empty' "''${manifest}")"
 
-        if [[ -z "${host}" || "${host}" != "${config.networking.hostName}" ]]; then
-          echo "error: manifest host mismatch (${host})" >&2
+        if [[ -z "''${host}" || "''${host}" != "${config.networking.hostName}" ]]; then
+          echo "error: manifest host mismatch (''${host})" >&2
           exit 2
         fi
 
-        if [[ ! "${rev}" =~ ^[0-9a-f]{40}$ ]]; then
+        if [[ ! "''${rev}" =~ ^[0-9a-f]{40}$ ]]; then
           echo "error: invalid rev in manifest" >&2
           exit 2
         fi
 
-        if [[ -z "${toplevel}" || "${toplevel}" =~ [[:space:]] || "${toplevel}" != /nix/store/* ]]; then
+        if [[ -z "''${toplevel}" || "''${toplevel}" =~ [[:space:]] || "''${toplevel}" != /nix/store/* ]]; then
           echo "error: invalid toplevel in manifest" >&2
           exit 2
         fi
 
-        /etc/clawdlets/bin/switch-system --toplevel "${toplevel}" --rev "${rev}"
+        /etc/clawdlets/bin/switch-system --toplevel "''${toplevel}" --rev "''${rev}"
       '';
     };
 
