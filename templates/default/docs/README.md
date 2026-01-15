@@ -22,5 +22,5 @@
 
 ## Template docs sync
 
-`packages/template/dist/template/docs` is generated from `docs/`.
-After updating docs, run `pnpm -C packages/template build` and commit the dist changes.
+Template docs live in `regenrek/clawdlets-template` under `templates/default/docs`.
+Infra + template docs live in the template repo. If you change docs here, mirror the updates into the template repo.
