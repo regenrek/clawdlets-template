@@ -9,4 +9,4 @@ Operator cadence (suggested):
 3b) If `services.clawdbotFleet.opsSnapshot.enable = true`: check `/var/lib/clawdlets/ops/snapshots/latest.json`
 4) If degraded: capture logs (`clawdlets server logs ...`), then codify + rebuild pinned (`--rev <sha|HEAD>`)
 
-Rule: if a fix can’t be expressed as repo + `.clawdlets/` change, treat it as breakglass and follow `docs/ops-invariants.md`.
+Rule: if a fix can’t be expressed as repo + `.clawdlets/` change, treat it as breakglass and follow clawdlets repo `docs/ops-invariants.md`.

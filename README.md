@@ -4,7 +4,7 @@ Project templates for clawdlets.
 
 ## Templates
 
-- `templates/default/` — canonical clawdlets project template (fleet + infra + docs).
+- `templates/default/` — canonical clawdlets project template (fleet + infra + agent-playbooks).
 
 ## Usage
 

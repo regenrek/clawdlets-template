@@ -16,4 +16,8 @@ Quickstart
 7) `clawdlets bootstrap`
 8) join tailnet, then: `clawdlets host set --target-host admin@<tailscale-ip>` then `clawdlets server deploy --manifest deploy-manifest.<host>.json` and `clawdlets lockdown`
 
-Docs: `docs/README.md`
+Docs: see the clawdlets repo `docs/README.md`
+
+Safety
+- `clawdlets project init` installs git hooks to block plaintext secrets.
+- Rules live in `.forbidden-paths.regex`; sops checks run on `secrets/*.yaml`.
