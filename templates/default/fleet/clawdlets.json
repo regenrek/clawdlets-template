@@ -31,7 +31,7 @@
         }
       },
       "operator": { "deploy": { "enable": false } },
-      "sshExposure": { "mode": "tailnet" },
+      "sshExposure": { "mode": "bootstrap" },
       "tailnet": { "mode": "tailscale" },
       "agentModelPrimary": "zai/glm-4.7"
     }
