@@ -26,6 +26,15 @@ jobs:
         with:
           node-version: 22
 
+      - name: Verify manifest public key configured
+        run: |
+          set -euo pipefail
+          key="$(cat config/manifest.minisign.pub)"
+          if [[ -z "${key}" || "${key}" == "CHANGE_ME_MINISIGN_PUBLIC_KEY" ]]; then
+            echo "error: config/manifest.minisign.pub is still the placeholder"
+            exit 1
+          fi
+
       - name: Read CLI version
         id: cli
         run: |

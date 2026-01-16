@@ -45,6 +45,7 @@ Template source defaults to `regenrek/clawdlets-template` (`templates/default`).
 0.5) Enable Garnix for the project repo (private cache) and add the netrc secret:
 - turn on Garnix for the repo and set the cache to private
 - add `secrets/hosts/<host>/garnix_netrc.yaml` with your netrc credentials (required)
+- replace the placeholder `config/manifest.minisign.pub` with your minisign public key (must match `MINISIGN_PRIVATE_KEY` in GitHub Actions)
 
 1) Configure fleet + host (CLI-first):
 - set guild id: `clawdlets fleet set --guild-id <discord-guild-id>`
