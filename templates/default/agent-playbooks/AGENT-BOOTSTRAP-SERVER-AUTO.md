@@ -90,8 +90,10 @@ clawdlets lockdown --host <host>
 
 ## Step 6: deploy + verify
 
+Important: deploy requires a Linux-built NixOS system artifact. Non-interactive day2+ assumes CI manifests exist.
+
 ```
-clawdlets server deploy --host <host>
+clawdlets server deploy --host <host> --manifest deploy-manifest.<host>.json
 clawdlets server status --host <host>
 ```
 

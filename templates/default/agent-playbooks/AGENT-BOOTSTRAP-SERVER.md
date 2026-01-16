@@ -169,13 +169,25 @@ clawdlets lockdown --host <host>
 
 ## Step 9: deploy + verify
 
+Important: deploy requires a Linux-built NixOS system artifact. On macOS/Windows, do not run `clawdlets server deploy` without a manifest/toplevel.
+
+Preferred (GitOps / CI):
+- Enable `.github/workflows/deploy-manifest.yml` + `.github/workflows/deploy.yml` in this repo (set required secrets + keys).
+- Push to `main`. CI builds the system on Linux, publishes signed manifests, then deploys over tailnet.
+
+Manual (still uses CI-built manifest):
+1) Download the signed manifest for your host (from GitHub Pages):
+   - `deploy/<host>/latest.json`
+   - `deploy/<host>/latest.json.minisig`
+2) Deploy by manifest (signature verified):
+
 ```
-clawdlets server deploy --host <host>
+clawdlets server deploy --host <host> --manifest deploy-manifest.<host>.json
 clawdlets server status --host <host>
 ```
 
 Notes
 - If bootstrap fails, stop, fix missing values, then rerun. Don’t pass `--force`.
 - `.clawdlets/secrets.json` (if you use it) is plaintext. Never commit.
-- `server deploy --manifest ...` exists for CI/self-update flows; not required for day0.
+- `server deploy` should be driven by `--manifest` (CI) or `--toplevel` (Linux builder).
 - self-update requires CI to publish manifests (and signatures if using minisign).
