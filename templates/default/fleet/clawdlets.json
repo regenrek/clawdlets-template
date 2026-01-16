@@ -14,7 +14,7 @@
   "hosts": {
     "clawdbot-fleet-host": {
       "enable": false,
-      "diskDevice": "/dev/disk/by-id/CHANGE_ME",
+      "diskDevice": "/dev/sda",
       "sshAuthorizedKeys": [],
       "sshKnownHosts": [],
       "flakeHost": "",
@@ -31,7 +31,7 @@
         }
       },
       "operator": { "deploy": { "enable": false } },
-      "sshExposure": { "mode": "tailnet" },
+      "sshExposure": { "mode": "bootstrap" },
       "tailnet": { "mode": "tailscale" },
       "agentModelPrimary": "zai/glm-4.7"
     }

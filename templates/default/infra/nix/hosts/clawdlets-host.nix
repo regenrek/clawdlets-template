@@ -21,7 +21,7 @@ in {
     ../modules/clawdlets-host-meta.nix
   ];
 
-  clawdlets.diskDevice = hostCfg.diskDevice or "/dev/disk/by-id/CHANGE_ME";
+  clawdlets.diskDevice = hostCfg.diskDevice or "/dev/sda";
 
   clawdlets.sshExposure.mode = sshExposureMode;
 

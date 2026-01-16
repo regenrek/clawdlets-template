@@ -1,54 +1,91 @@
 # AGENT-BOOTSTRAP-SERVER
 
-Goal: non-interactive day-0 bringup for a clawdlets fleet repo (Hetzner + Tailscale + Discord), using the `clawdlets` CLI.
+Goal: new user runs this top to bottom. Agent drives commands, but stops on missing data.
 
 Start point
-- Repo already created from `@clawdlets/template`
-- CWD is repo root (has `fleet/clawdlets.json`)
+- repo created by `clawdlets project init`
+- CWD repo root (has `fleet/clawdlets.json`)
+- choose `<host>` name
 
-Canonical inputs
-- Config (committed): `fleet/clawdlets.json`
-- Runtime secrets (committed, encrypted): `secrets/**` (sops+age)
-- Deploy creds (local-only): `.clawdlets/env`
-  - `HCLOUD_TOKEN` required (Hetzner API)
-  - `GITHUB_TOKEN` optional (private base flake)
-  - `NIX_BIN`, `SOPS_AGE_KEY_FILE` optional
-- Non-interactive secrets input (local-only, plaintext): `.clawdlets/secrets.json` (0600; never commit)
+Rules
+- do not use `--force` unless told
+- `clawdlets bootstrap` runs doctor for nixos-anywhere and stops on missing data
+- image mode skips doctor; avoid for first-time users
 
-## Fast path
+Inputs you must collect
+- Hetzner token (HCLOUD_TOKEN)
+- SSH pubkey file path
+- admin CIDR (your IP /32)
+- server type, disk device
+- tailnet mode (tailscale or none)
+- Discord tokens per bot
+- LLM API keys referenced by `fleet.envSecrets`
+- optional: GitHub token if base flake is private
+- optional: self-update manifest URL (+ minisign public key/signature URL)
 
-1) Config + host
-- edit `fleet/clawdlets.json`:
-  - `fleet.guildId`
-  - `fleet.bots`
-  - `fleet.envSecrets`
-  - `hosts.<host>` (diskDevice, serverType, adminCidr, sshPubkeyFile, etc.)
-  - `hosts.<host>.sshExposure.mode = "bootstrap"`
+## Step 1: config (edit `fleet/clawdlets.json`)
 
-2) Deploy creds
-- `clawdlets env init`
-- edit `.clawdlets/env` and set `HCLOUD_TOKEN=...`
+Required fields
+- `fleet.guildId`
+- `fleet.bots` (list)
+- `fleet.envSecrets`
+- `hosts.<host>.enable = true`
+- `hosts.<host>.diskDevice`
+- `hosts.<host>.hetzner.serverType`
+- `hosts.<host>.opentofu.adminCidr`
+- `hosts.<host>.opentofu.sshPubkeyFile`
+- `hosts.<host>.sshExposure.mode = "bootstrap"`
+- `hosts.<host>.tailnet.mode = "tailscale" | "none"`
 
-3) Secrets (non-interactive)
-- `clawdlets secrets init --host <host>`
-- edit `.clawdlets/secrets.json`:
-  - `adminPasswordHash` (YESCRYPT hash)
-  - `tailscaleAuthKey` (if tailnet=tailscale)
-  - `discordTokens.<bot>` for each bot
-  - `secrets.<secretName>` for LLM API keys referenced by `fleet.envSecrets`
-- `clawdlets secrets init --host <host> --from-json .clawdlets/secrets.json --yes`
+Optional self-update
+- `hosts.<host>.selfUpdate.enable = true`
+- `hosts.<host>.selfUpdate.manifestUrl = "https://<pages>/deploy/<host>/latest.json"`
+- optional: `selfUpdate.publicKey` + `selfUpdate.signatureUrl`
 
-4) Apply
-- `clawdlets doctor --host <host> --scope bootstrap`
-- `clawdlets bootstrap --host <host>`
+## Step 2: deploy creds
 
-5) After bootstrap
-- join tailnet, then set:
-  - `clawdlets host set --host <host> --target-host admin@<tailscale-ip>`
-- then:
-  - `clawdlets host set --host <host> --ssh-exposure tailnet`
-  - `clawdlets server deploy --host <host> --manifest deploy-manifest.<host>.json`
-  - `clawdlets lockdown --host <host>`
+```
+clawdlets env init
+```
 
-## Notes
-- `.clawdlets/secrets.json` is plaintext. Keep it out of git.
+- set `HCLOUD_TOKEN=...` in `.clawdlets/env`
+- set `GITHUB_TOKEN=...` only if base flake is private
+
+## Step 3: secrets (non-interactive)
+
+```
+clawdlets secrets init --host <host>
+```
+
+Fill `.clawdlets/secrets.json`:
+- `adminPasswordHash` (YESCRYPT hash)
+- `tailscaleAuthKey` (if tailnet=tailscale)
+- `discordTokens.<bot>` for each bot
+- `secrets.<secretName>` for LLM keys in `fleet.envSecrets`
+
+Then:
+
+```
+clawdlets secrets init --host <host> --from-json .clawdlets/secrets.json --yes
+```
+
+## Step 4: bootstrap
+
+```
+clawdlets bootstrap --host <host>
+```
+
+If bootstrap fails, stop, fix missing values, then rerun. Do not pass `--force`.
+
+## Step 5: after tailnet
+
+```
+clawdlets host set --host <host> --target-host admin@<tailscale-ip>
+clawdlets host set --host <host> --ssh-exposure tailnet
+clawdlets server deploy --host <host> --manifest deploy-manifest.<host>.json
+clawdlets lockdown --host <host>
+```
+
+Notes
+- `.clawdlets/secrets.json` is plaintext. Never commit.
+- self-update requires CI to publish manifests (and signatures if using minisign).
