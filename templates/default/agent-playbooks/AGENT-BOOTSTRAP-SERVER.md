@@ -189,5 +189,5 @@ clawdlets server status --host <host>
 Notes
 - If bootstrap fails, stop, fix missing values, then rerun. Don’t pass `--force`.
 - `.clawdlets/secrets.json` (if you use it) is plaintext. Never commit.
-- `server deploy --manifest ...` exists for CI/self-update flows; not required for day0.
+- `server deploy` should be driven by `--manifest` (CI) or `--toplevel` (Linux builder).
 - self-update requires CI to publish manifests (and signatures if using minisign).
