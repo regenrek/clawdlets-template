@@ -18,10 +18,10 @@ Day0 defaults (Hetzner-focused)
 - `cache.garnix.private.enable=false` (enable later, after stable deploy)
 
 Inputs to collect (agent asks)
-- Hetzner token (HCLOUD_TOKEN)
+- Hetzner token (`HCLOUD_TOKEN`)
 - SSH pubkey file path
-- admin CIDR (your IP /32)
-- server type, disk device
+- admin CIDR (your IP `/32`)
+- server type
 - tailnet mode (`tailscale` or `none`)
 - Discord tokens per bot
 - LLM API keys referenced by `fleet.envSecrets`
@@ -38,6 +38,7 @@ Day0 command map (use these)
 - `clawdlets host add`
 - `clawdlets host set-default`
 - `clawdlets host set`
+- `clawdlets config set`
 - `clawdlets config validate`
 - `clawdlets secrets init --interactive`
 - `clawdlets secrets verify`
@@ -55,7 +56,7 @@ clawdlets project init
 
 Agent collects: repo dir, `<host>`, and any template prompts.
 
-## Step 2: deploy creds (wizard-ish)
+## Step 2: deploy creds
 
 ```
 clawdlets env init
@@ -129,7 +130,7 @@ Agent prompts for:
 - `admin_password_hash` (YESCRYPT)
 - `tailscale_auth_key` (if `tailnet=tailscale`)
 - `discord_token_<bot>` for each bot
-- `z_ai_api_key` (or whatever `fleet.envSecrets` references)
+- LLM/provider keys referenced by `fleet.envSecrets` (e.g. `z_ai_api_key`)
 
 Then verify:
 
@@ -174,6 +175,7 @@ clawdlets server status --host <host>
 ```
 
 Notes
-- `clawdlets bootstrap` stops on missing values; fix + rerun. Don’t pass `--force`.
+- If bootstrap fails, stop, fix missing values, then rerun. Don’t pass `--force`.
 - `.clawdlets/secrets.json` (if you use it) is plaintext. Never commit.
+- `server deploy --manifest ...` exists for CI/self-update flows; not required for day0.
 - self-update requires CI to publish manifests (and signatures if using minisign).
