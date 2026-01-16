@@ -27,7 +27,7 @@
         if hostNamesRaw == [ ] then
           throw "fleet/clawdlets.json must define at least one host under .hosts"
         else
-          hostNamesRaw;
+          builtins.filter (hostName: (cfg.hosts.${hostName}.enable or false) == true) hostNamesRaw;
       flakeInfo = {
         clawdlets = {
           rev = self.rev or null;
@@ -75,12 +75,17 @@
               name = "${hostName}-image";
               value = self.nixosConfigurations.${hostName}.config.formats.raw;
             }) hostNames);
-            first = builtins.elemAt hostNames 0;
+            first = if hostNames == [ ] then null else builtins.elemAt hostNames 0;
           in
-            byHost // byHostImages // {
-              default = byHost."${first}-system";
-              defaultImage = byHostImages."${first}-image";
-            };
+            byHost // byHostImages // (
+              if first == null then
+                { }
+              else
+                {
+                  default = byHost."${first}-system";
+                  defaultImage = byHostImages."${first}-image";
+                }
+            );
       };
     };
 }
