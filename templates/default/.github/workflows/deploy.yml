@@ -63,7 +63,10 @@ jobs:
             experimental-features = nix-command flakes
 
       - name: Install minisign
-        run: nix profile install nixpkgs#minisign
+        run: |
+          set -euo pipefail
+          nix profile install nixpkgs#minisign
+          echo "${HOME}/.nix-profile/bin" >> "$GITHUB_PATH"
 
       - name: Configure SSH
         run: |
@@ -101,8 +104,8 @@ jobs:
             exit 2
           fi
 
-          hosts=$(jq -r '.hosts | keys[]' fleet/clawdlets.json)
-          for host in ${hosts}; do
+          jq -r '.hosts | keys[]' fleet/clawdlets.json | while IFS= read -r host; do
+            [[ -z "${host}" ]] && continue
             if [[ -n "${HOST_FILTER}" && "${host}" != "${HOST_FILTER}" ]]; then
               continue
             fi

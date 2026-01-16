@@ -58,9 +58,9 @@ jobs:
       - name: Build deploy manifests
         run: |
           set -euo pipefail
-          hosts=$(jq -r '.hosts | keys[]' fleet/clawdlets.json)
           mkdir -p deploy
-          for host in ${hosts}; do
+          jq -r '.hosts | keys[]' fleet/clawdlets.json | while IFS= read -r host; do
+            [[ -z "${host}" ]] && continue
             clawdlets server manifest --host "${host}" --out "deploy-manifest.${host}.json"
             rev=$(jq -r '.rev' "deploy-manifest.${host}.json")
             mkdir -p "deploy/${host}"
