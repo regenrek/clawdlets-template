@@ -39,10 +39,6 @@ jobs:
     steps:
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
 
-      - uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6
-        with:
-          node-version: 22
-
       - name: Verify manifest public key configured
         run: |
           set -euo pipefail
@@ -63,8 +59,31 @@ jobs:
           fi
           echo "version=${version}" >> "$GITHUB_OUTPUT"
 
-      - name: Install clawdlets CLI
-        run: npm install -g clawdlets@${{ steps.cli.outputs.version }}
+      - name: Checkout clawdlets (CLI)
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+        with:
+          repository: regenrek/clawdlets
+          ref: ${{ steps.cli.outputs.version }}
+          path: clawdlets-cli
+
+      - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
+        with:
+          version: 10.25.0
+
+      - uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: clawdlets-cli/pnpm-lock.yaml
+
+      - name: Build + install clawdlets CLI (from source)
+        working-directory: clawdlets-cli
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile
+          pnpm -r build
+          node scripts/prepare-package.mjs --out dist/npm/clawdlets
+          npm install -g dist/npm/clawdlets
 
       - uses: cachix/install-nix-action@4e002c8ec80594ecd40e759629461e26c8abed15 # v31.9.0
         with:
