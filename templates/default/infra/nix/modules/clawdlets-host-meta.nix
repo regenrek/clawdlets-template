@@ -22,7 +22,7 @@
 
     diskDevice = lib.mkOption {
       type = lib.types.str;
-      default = "/dev/disk/by-id/CHANGE_ME";
+      default = "/dev/sda";
       description = "Primary disk device used by disko.";
       example = "/dev/nvme0n1";
     };
