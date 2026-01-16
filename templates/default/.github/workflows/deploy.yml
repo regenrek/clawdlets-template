@@ -83,7 +83,8 @@ jobs:
           pnpm install --frozen-lockfile
           pnpm -r build
           node scripts/prepare-package.mjs --out dist/npm/clawdlets
-          npm install -g dist/npm/clawdlets
+          tgz="$(cd dist/npm/clawdlets && npm pack --silent)"
+          npm install -g "dist/npm/clawdlets/${tgz}"
 
       - uses: cachix/install-nix-action@4e002c8ec80594ecd40e759629461e26c8abed15 # v31.9.0
         with:
