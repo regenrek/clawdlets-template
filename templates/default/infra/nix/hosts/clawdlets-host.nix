@@ -18,6 +18,7 @@ in {
     ../modules/clawdlets-host-baseline.nix
     ../modules/clawdlets-self-update.nix
     ../modules/clawdbot-fleet.nix
+    ../modules/clf-orchestrator.nix
     ../modules/clawdlets-host-meta.nix
   ];
 

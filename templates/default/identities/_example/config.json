@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "model": { "primary": "", "fallbacks": [] },
+  "skills": { "allowBundled": [] },
+  "defaults": { "maxConcurrent": 1 }
+}
+

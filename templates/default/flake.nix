@@ -15,9 +15,12 @@
 
     nix-clawdbot.url = "github:clawdbot/nix-clawdbot";
     nix-clawdbot.inputs.nixpkgs.follows = "nixpkgs";
+
+    clawdlets.url = "github:regenrek/clawdlets";
+    clawdlets.inputs.nixpkgs.follows = "nixpkgs";
   };
 
-  outputs = { self, nixpkgs, disko, nixos-generators, sops-nix, nix-clawdbot, ... }:
+  outputs = { self, nixpkgs, disko, nixos-generators, sops-nix, nix-clawdbot, clawdlets, ... }:
     let
       system = "x86_64-linux";
       pkgs = import nixpkgs { inherit system; };
@@ -43,25 +46,42 @@
         };
       };
     in {
-      nixosConfigurations = nixpkgs.lib.genAttrs hostNames (hostName:
-        nixpkgs.lib.nixosSystem {
-          inherit system;
-          specialArgs = { inherit nix-clawdbot flakeInfo; };
-          modules = [
-            disko.nixosModules.disko
-            nixos-generators.nixosModules.all-formats
-            sops-nix.nixosModules.sops
+      nixosConfigurations =
+        let
+          hostConfigs = nixpkgs.lib.genAttrs hostNames (hostName:
+            nixpkgs.lib.nixosSystem {
+              inherit system;
+              specialArgs = { inherit nix-clawdbot clawdlets flakeInfo; };
+              modules = [
+                disko.nixosModules.disko
+                nixos-generators.nixosModules.all-formats
+                sops-nix.nixosModules.sops
 
-            ./infra/nix/modules/clawdlets-host-meta.nix
-            ({ ... }: {
-              clawdlets.hostName = hostName;
-            })
+                ./infra/nix/modules/clawdlets-host-meta.nix
+                ({ ... }: {
+                  clawdlets.hostName = hostName;
+                })
 
-            ./infra/disko/example.nix
-            ./infra/nix/modules/clawdlets-image-formats.nix
-            ./infra/nix/hosts/clawdlets-host.nix
-          ];
-        });
+                ./infra/disko/example.nix
+                ./infra/nix/modules/clawdlets-image-formats.nix
+                ./infra/nix/hosts/clawdlets-host.nix
+              ];
+            });
+
+          cattleConfig = nixpkgs.lib.nixosSystem {
+            inherit system;
+            specialArgs = { inherit nix-clawdbot clawdlets flakeInfo; };
+            modules = [
+              disko.nixosModules.disko
+              nixos-generators.nixosModules.all-formats
+              ./infra/disko/example.nix
+              ./infra/nix/cattle/image.nix
+            ];
+          };
+        in
+          hostConfigs // {
+            clawdlets-cattle = cattleConfig;
+          };
 
       nixosModules.clawdbotFleet = import ./infra/nix/modules/clawdbot-fleet.nix;
       packages = {
@@ -77,7 +97,13 @@
             }) hostNames);
             first = if hostNames == [ ] then null else builtins.elemAt hostNames 0;
           in
-            byHost // byHostImages // (
+            byHost
+            // byHostImages
+            // {
+              clawdlets-cattle-image = self.nixosConfigurations.clawdlets-cattle.config.formats.raw;
+              clawdlets-cattle-system = self.nixosConfigurations.clawdlets-cattle.config.system.build.toplevel;
+            }
+            // (
               if first == null then
                 { }
               else

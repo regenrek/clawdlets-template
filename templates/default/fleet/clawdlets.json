@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 5,
+  "schemaVersion": 6,
   "defaultHost": "clawdbot-fleet-host",
   "baseFlake": "",
   "fleet": {
@@ -10,6 +10,18 @@
     "routingOverrides": {},
     "codex": { "enable": false, "bots": [] },
     "backups": { "restic": { "enable": false, "repository": "" } }
+  },
+  "cattle": {
+    "enabled": false,
+    "hetzner": {
+      "image": "",
+      "serverType": "cx22",
+      "location": "nbg1",
+      "maxInstances": 10,
+      "defaultTtl": "2h",
+      "labels": { "managed-by": "clawdlets" }
+    },
+    "defaults": { "autoShutdown": true, "callbackUrl": "" }
   },
   "hosts": {
     "clawdbot-fleet-host": {

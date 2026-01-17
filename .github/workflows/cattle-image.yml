@@ -1,0 +1,125 @@
+name: cattle-image
+
+on:
+  workflow_dispatch:
+    inputs:
+      location:
+        description: Hetzner location (fsn1, nbg1, hel1, ash, hil, sin)
+        required: false
+        default: nbg1
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-upload:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+
+      - uses: cachix/install-nix-action@4e002c8ec80594ecd40e759629461e26c8abed15 # v31.9.0
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Build cattle raw image (Nix)
+        id: build
+        working-directory: templates/default
+        run: |
+          set -euo pipefail
+          out="$(nix build --json --no-link .#clawdlets-cattle-image | jq -r '.[0].outputs.out')"
+          if [[ -z "${out}" || "${out}" == "null" ]]; then
+            echo "error: nix build did not return an output path"
+            exit 1
+          fi
+          if [[ ! -e "${out}" ]]; then
+            echo "error: output path missing: ${out}"
+            exit 1
+          fi
+          image_path="${out}"
+          if [[ -d "${out}" ]]; then
+            image_path="$(find "${out}" -maxdepth 2 -type f -name '*.raw' | sort | head -n 1)"
+            if [[ -z "${image_path}" ]]; then
+              echo "error: could not locate a .raw image under output dir: ${out}"
+              exit 1
+            fi
+          fi
+          echo "out=${out}" >> "$GITHUB_OUTPUT"
+          echo "image_path=${image_path}" >> "$GITHUB_OUTPUT"
+
+      - name: Install hcloud-upload-image
+        run: |
+          set -euo pipefail
+          go version
+          go install github.com/apricote/hcloud-upload-image@v1.3.0
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+          hcloud-upload-image --version
+
+      - name: Upload image to Hetzner (hcloud-upload-image)
+        id: upload
+        env:
+          HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${HCLOUD_TOKEN}" ]]; then
+            echo "error: missing secrets.HCLOUD_TOKEN"
+            exit 1
+          fi
+
+          loc="${{ inputs.location }}"
+          if [[ -z "${loc}" ]]; then loc="nbg1"; fi
+
+          log="$(mktemp -t hcloud-upload-image.XXXXXX.log)"
+
+          # Capture full output (contains ANSI). Parse image id from the final success line.
+          set +e
+          hcloud-upload-image upload \
+            --image-path "${{ steps.build.outputs.image_path }}" \
+            --architecture x86 \
+            --location "${loc}" \
+            --description "clawdlets cattle image (${GITHUB_REF_NAME:-${GITHUB_SHA}})" \
+            --labels "managed-by=clawdlets,role=cattle-image,git-ref=${GITHUB_REF_NAME:-unknown},git-sha=${GITHUB_SHA}" \
+            2>&1 | tee "${log}"
+          rc="${PIPESTATUS[0]}"
+          set -e
+
+          if [[ "${rc}" != "0" ]]; then
+            echo "error: hcloud-upload-image failed (exit ${rc})"
+            exit "${rc}"
+          fi
+
+          # Strip ANSI, extract last image=123 occurrence.
+          image_id="$(
+            sed -E $'s/\\x1B\\[[0-9;]*[mK]//g' "${log}" \
+              | grep -Eo 'image=[0-9]+' \
+              | tail -n 1 \
+              | cut -d= -f2
+          )"
+
+          if [[ -z "${image_id}" || ! "${image_id}" =~ ^[0-9]+$ ]]; then
+            echo "error: failed to parse image id from logs"
+            exit 1
+          fi
+
+          cat > cattle-image.json <<EOF
+          {
+            "imageId": "${image_id}",
+            "gitRef": "${GITHUB_REF_NAME:-unknown}",
+            "gitSha": "${GITHUB_SHA}",
+            "location": "${loc}"
+          }
+          EOF
+
+          cat cattle-image.json
+          echo "image_id=${image_id}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload cattle image metadata artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cattle-image
+          path: cattle-image.json
+          if-no-files-found: error
+          retention-days: 30
