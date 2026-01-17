@@ -34,7 +34,7 @@ in
     envFile = lib.mkOption {
       type = lib.types.str;
       default = "/run/clawdlets/cattle/env";
-      description = "Optional EnvironmentFile (plaintext secret env, tmpfs).";
+      description = "Path for cattle-run to write fetched secret env exports (tmpfs).";
     };
 
     workspaceDir = lib.mkOption {
@@ -97,6 +97,7 @@ in
         CLAWDLETS_CATTLE_WORKSPACE_DIR = cfg.workspaceDir;
         CLAWDLETS_CATTLE_GATEWAY_PORT = toString cfg.gatewayPort;
         CLAWDLETS_CATTLE_AUTO_SHUTDOWN = if cfg.autoShutdown then "1" else "0";
+        CLAWDLETS_CATTLE_ENV_FILE = cfg.envFile;
         CLAWDBOT_DISABLE_BONJOUR = "1";
       };
 
@@ -105,8 +106,6 @@ in
         User = "root";
         Group = "root";
         WorkingDirectory = cfg.baseDir;
-
-        EnvironmentFile = "-${cfg.envFile}";
 
         ExecStart = "/etc/clawdlets/bin/cattle-run";
 
@@ -131,4 +130,3 @@ in
     };
   };
 }
-

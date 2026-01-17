@@ -17,8 +17,8 @@ if [[ -z "${callback_url}" || "${callback_url}" == "null" ]]; then
 fi
 
 curl -fsS \
-  --proto =https,http \
-  --proto-redir =https,http \
+  --proto =https \
+  --proto-redir =https \
   --connect-timeout 5 \
   --max-time 15 \
   --retry 3 \

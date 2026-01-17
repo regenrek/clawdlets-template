@@ -120,8 +120,8 @@ in
       };
       secretsListenHost = lib.mkOption {
         type = lib.types.str;
-        default = "0.0.0.0";
-        description = "Internal cattle secrets HTTP bind host (should be reachable over tailnet).";
+        default = "auto";
+        description = "Internal cattle secrets HTTP bind host (default: auto resolves tailscale0 IPv4).";
       };
       secretsListenPort = lib.mkOption {
         type = lib.types.int;
@@ -131,11 +131,11 @@ in
       secretsBaseUrl = lib.mkOption {
         type = lib.types.str;
         default = "";
-        description = "Base URL cattle uses to fetch secrets env (default: http://$HOSTNAME:<secretsListenPort>).";
+        description = "Base URL cattle uses to fetch secrets env (default: computed from listen host + port).";
       };
       bootstrapTtlMs = lib.mkOption {
         type = lib.types.int;
-        default = 10 * 60 * 1000;
+        default = 5 * 60 * 1000;
         description = "One-time bootstrap token TTL (ms).";
       };
     };
@@ -242,8 +242,8 @@ in
     systemd.services.clf-orchestrator = {
       description = "ClawdletFleet orchestrator (jobs + cattle)";
       wantedBy = [ "multi-user.target" ];
-      after = [ "network-online.target" "sops-nix.service" ];
-      wants = [ "network-online.target" "sops-nix.service" ];
+      after = [ "network-online.target" "sops-nix.service" "tailscaled.service" ];
+      wants = [ "network-online.target" "sops-nix.service" "tailscaled.service" ];
       requires = [ "clf-orchestrator.socket" ];
 
       environment = {
@@ -261,10 +261,7 @@ in
 
         CLF_CATTLE_SECRETS_LISTEN_HOST = cfg.cattle.secretsListenHost;
         CLF_CATTLE_SECRETS_LISTEN_PORT = toString cfg.cattle.secretsListenPort;
-        CLF_CATTLE_SECRETS_BASE_URL =
-          if cfg.cattle.secretsBaseUrl != ""
-          then cfg.cattle.secretsBaseUrl
-          else "http://${config.networking.hostName}:${toString cfg.cattle.secretsListenPort}";
+        CLF_CATTLE_SECRETS_BASE_URL = cfg.cattle.secretsBaseUrl;
         CLF_CATTLE_BOOTSTRAP_TTL_MS = toString cfg.cattle.bootstrapTtlMs;
 
         CLF_IDENTITIES_ROOT = "/etc/clf/identities";

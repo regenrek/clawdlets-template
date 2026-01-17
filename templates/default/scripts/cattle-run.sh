@@ -5,9 +5,11 @@ task_file="${CLAWDLETS_CATTLE_TASK_FILE:-/var/lib/clawdlets/cattle/task.json}"
 result_file="${CLAWDLETS_CATTLE_RESULT_FILE:-/var/lib/clawdlets/cattle/result.json}"
 workspace_dir="${CLAWDLETS_CATTLE_WORKSPACE_DIR:-/var/lib/clawdlets/cattle/workspace}"
 gateway_port="${CLAWDLETS_CATTLE_GATEWAY_PORT:-18789}"
-auto_shutdown="${CLAWDLETS_CATTLE_AUTO_SHUTDOWN:-1}"
 bootstrap_file="${CLAWDLETS_CATTLE_BOOTSTRAP_FILE:-/run/clawdlets/cattle/bootstrap.json}"
 env_file="${CLAWDLETS_CATTLE_ENV_FILE:-/run/clawdlets/cattle/env}"
+public_env_file="/run/clawdlets/cattle/env.public"
+
+export CLAWDLETS_CATTLE_AUTO_SHUTDOWN="${CLAWDLETS_CATTLE_AUTO_SHUTDOWN:-1}"
 
 now_iso() {
   date -Iseconds
@@ -15,6 +17,8 @@ now_iso() {
 
 umask 077
 mkdir -p "${workspace_dir}"
+mkdir -p "/run/clawdlets/cattle"
+rm -f "${env_file}" || true
 
 started_at="$(now_iso)"
 gateway_log="${workspace_dir}/gateway.log"
@@ -41,11 +45,31 @@ fail() {
 
   /etc/clawdlets/bin/cattle-callback || true
 
-  if [[ "${auto_shutdown}" == "1" ]]; then
+  if [[ "${CLAWDLETS_CATTLE_AUTO_SHUTDOWN:-1}" == "1" ]]; then
     systemctl poweroff || true
   fi
 
   exit 1
+}
+
+load_public_env() {
+  if [[ ! -f "${public_env_file}" ]]; then
+    return 0
+  fi
+
+  jq -e 'type == "object"' "${public_env_file}" >/dev/null 2>&1 || {
+    fail "invalid env.public (expected JSON object): ${public_env_file}"
+  }
+
+  local v
+  v="$(jq -r '.CLAWDLETS_CATTLE_AUTO_SHUTDOWN // ""' "${public_env_file}" 2>/dev/null || true)"
+  if [[ -z "${v}" || "${v}" == "null" ]]; then
+    return 0
+  fi
+  if [[ "${v}" != "0" && "${v}" != "1" ]]; then
+    fail "invalid env.public CLAWDLETS_CATTLE_AUTO_SHUTDOWN (expected 0|1): ${v}"
+  fi
+  export CLAWDLETS_CATTLE_AUTO_SHUTDOWN="${v}"
 }
 
 fetch_secrets_env() {
@@ -107,7 +131,17 @@ fetch_secrets_env() {
     fail "control plane env response missing .env object"
   }
 
-  jq -r '.env | to_entries[] | "export " + .key + "=" + (.value | @sh)' "${resp}" >"${tmp_env}"
+  while IFS= read -r key; do
+    if [[ -z "${key}" ]]; then
+      continue
+    fi
+    if [[ ! "${key}" =~ ^[A-Z_][A-Z0-9_]*$ ]]; then
+      rm -f "${resp}" "${tmp_env}" || true
+      fail "control plane env returned invalid env var name: ${key}"
+    fi
+  done < <(jq -r '.env | keys[]' "${resp}" 2>/dev/null || true)
+
+  jq -r '.env | to_entries | sort_by(.key)[] | "export " + .key + "=" + (.value | tostring | @sh)' "${resp}" >"${tmp_env}"
   chmod 0400 "${tmp_env}"
   mv "${tmp_env}" "${env_file}"
 
@@ -116,7 +150,12 @@ fetch_secrets_env() {
 
   # shellcheck disable=SC1090
   source "${env_file}"
+  if [[ "${CLAWDLETS_CATTLE_AUTO_SHUTDOWN:-1}" == "1" ]]; then
+    rm -f "${env_file}" || true
+  fi
 }
+
+load_public_env
 
 if [[ ! -f "${task_file}" ]]; then
   fail "task file missing: ${task_file}"
@@ -152,6 +191,7 @@ export HOME="${workspace_dir}"
 
 gateway_pid=""
 
+# shellcheck disable=SC2329
 cleanup() {
   if [[ -n "${gateway_pid}" ]]; then
     if kill -0 "${gateway_pid}" >/dev/null 2>&1; then
@@ -209,7 +249,7 @@ mv "${result_file}.tmp" "${result_file}"
 
 /etc/clawdlets/bin/cattle-callback || true
 
-if [[ "${auto_shutdown}" == "1" ]]; then
+if [[ "${CLAWDLETS_CATTLE_AUTO_SHUTDOWN:-1}" == "1" ]]; then
   systemctl poweroff || true
 fi
 
