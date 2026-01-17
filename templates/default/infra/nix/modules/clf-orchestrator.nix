@@ -118,6 +118,26 @@ in
         default = cattleDefaults.autoShutdown or true;
         description = "Default autoShutdown for cattle.spawn jobs.";
       };
+      secretsListenHost = lib.mkOption {
+        type = lib.types.str;
+        default = "0.0.0.0";
+        description = "Internal cattle secrets HTTP bind host (should be reachable over tailnet).";
+      };
+      secretsListenPort = lib.mkOption {
+        type = lib.types.int;
+        default = 18337;
+        description = "Internal cattle secrets HTTP port (tailnet-only).";
+      };
+      secretsBaseUrl = lib.mkOption {
+        type = lib.types.str;
+        default = "";
+        description = "Base URL cattle uses to fetch secrets env (default: http://$HOSTNAME:<secretsListenPort>).";
+      };
+      bootstrapTtlMs = lib.mkOption {
+        type = lib.types.int;
+        default = 10 * 60 * 1000;
+        description = "One-time bootstrap token TTL (ms).";
+      };
     };
   };
 
@@ -132,6 +152,8 @@ in
         message = "clawdlets.tailnet.tailscale.authKeySecret must be set (needed to spawn cattle with tailscale).";
       }
     ];
+
+    networking.firewall.interfaces.tailscale0.allowedTCPPorts = lib.mkAfter [ cfg.cattle.secretsListenPort ];
 
     users.groups.clf-bots = { };
     users.groups.clf-orchestrator = { };
@@ -236,6 +258,14 @@ in
         CLF_CATTLE_DEFAULT_TTL = cfg.cattle.defaultTtl;
         CLF_CATTLE_LABELS_JSON = builtins.toJSON cfg.cattle.labels;
         CLF_CATTLE_AUTO_SHUTDOWN = if cfg.cattle.autoShutdown then "1" else "0";
+
+        CLF_CATTLE_SECRETS_LISTEN_HOST = cfg.cattle.secretsListenHost;
+        CLF_CATTLE_SECRETS_LISTEN_PORT = toString cfg.cattle.secretsListenPort;
+        CLF_CATTLE_SECRETS_BASE_URL =
+          if cfg.cattle.secretsBaseUrl != ""
+          then cfg.cattle.secretsBaseUrl
+          else "http://${config.networking.hostName}:${toString cfg.cattle.secretsListenPort}";
+        CLF_CATTLE_BOOTSTRAP_TTL_MS = toString cfg.cattle.bootstrapTtlMs;
 
         CLF_IDENTITIES_ROOT = "/etc/clf/identities";
         CLF_ADMIN_AUTHORIZED_KEYS_FILE = "/etc/clf/admin_authorized_keys";

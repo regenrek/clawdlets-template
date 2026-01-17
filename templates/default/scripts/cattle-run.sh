@@ -6,6 +6,8 @@ result_file="${CLAWDLETS_CATTLE_RESULT_FILE:-/var/lib/clawdlets/cattle/result.js
 workspace_dir="${CLAWDLETS_CATTLE_WORKSPACE_DIR:-/var/lib/clawdlets/cattle/workspace}"
 gateway_port="${CLAWDLETS_CATTLE_GATEWAY_PORT:-18789}"
 auto_shutdown="${CLAWDLETS_CATTLE_AUTO_SHUTDOWN:-1}"
+bootstrap_file="${CLAWDLETS_CATTLE_BOOTSTRAP_FILE:-/run/clawdlets/cattle/bootstrap.json}"
+env_file="${CLAWDLETS_CATTLE_ENV_FILE:-/run/clawdlets/cattle/env}"
 
 now_iso() {
   date -Iseconds
@@ -46,6 +48,76 @@ fail() {
   exit 1
 }
 
+fetch_secrets_env() {
+  if [[ ! -f "${bootstrap_file}" ]]; then
+    fail "bootstrap file missing: ${bootstrap_file}"
+  fi
+
+  local base_url token
+  base_url="$(jq -r '.baseUrl // ""' "${bootstrap_file}" 2>/dev/null || true)"
+  token="$(jq -r '.token // ""' "${bootstrap_file}" 2>/dev/null || true)"
+
+  if [[ -z "${base_url}" || "${base_url}" == "null" ]]; then
+    fail "invalid bootstrap.json (missing baseUrl)"
+  fi
+  if [[ -z "${token}" || "${token}" == "null" ]]; then
+    fail "invalid bootstrap.json (missing token)"
+  fi
+  if [[ "${base_url}" != http://* && "${base_url}" != https://* ]]; then
+    fail "invalid bootstrap.json baseUrl (expected http(s)): ${base_url}"
+  fi
+
+  local url
+  url="${base_url%/}/v1/cattle/env"
+
+  local resp tmp_env
+  resp="$(mktemp -p /run/clawdlets/cattle clawdlets-cattle.env.XXXXXX.json)"
+  tmp_env="$(mktemp -p /run/clawdlets/cattle clawdlets-cattle.env.XXXXXX.sh)"
+
+  set +e
+  curl -fsS \
+    --connect-timeout 5 \
+    --max-time 20 \
+    --retry 5 \
+    --retry-all-errors \
+    --retry-delay 1 \
+    -H "Authorization: Bearer ${token}" \
+    -H "Accept: application/json" \
+    "${url}" \
+    -o "${resp}"
+  local rc="$?"
+  set -e
+
+  if [[ "${rc}" != "0" ]]; then
+    rm -f "${resp}" "${tmp_env}" || true
+    fail "failed to fetch env from control plane (${url}); curl exit ${rc}"
+  fi
+
+  local ok
+  ok="$(jq -r '.ok // false' "${resp}" 2>/dev/null || true)"
+  if [[ "${ok}" != "true" ]]; then
+    local msg
+    msg="$(jq -r '.error.message // "invalid response"' "${resp}" 2>/dev/null || true)"
+    rm -f "${resp}" "${tmp_env}" || true
+    fail "control plane env response rejected: ${msg}"
+  fi
+
+  jq -e '.env and (.env | type == "object")' "${resp}" >/dev/null 2>&1 || {
+    rm -f "${resp}" "${tmp_env}" || true
+    fail "control plane env response missing .env object"
+  }
+
+  jq -r '.env | to_entries[] | "export " + .key + "=" + (.value | @sh)' "${resp}" >"${tmp_env}"
+  chmod 0400 "${tmp_env}"
+  mv "${tmp_env}" "${env_file}"
+
+  rm -f "${resp}" || true
+  rm -f "${bootstrap_file}" || true
+
+  # shellcheck disable=SC1090
+  source "${env_file}"
+}
+
 if [[ ! -f "${task_file}" ]]; then
   fail "task file missing: ${task_file}"
 fi
@@ -71,6 +143,8 @@ fi
 if [[ "${task_type}" != "clawdbot.gateway.agent" ]]; then
   fail "unsupported task type: ${task_type}"
 fi
+
+fetch_secrets_env
 
 export CLAWDBOT_NIX_MODE="1"
 export CLAWDBOT_STATE_DIR="${state_dir}"
@@ -140,4 +214,3 @@ if [[ "${auto_shutdown}" == "1" ]]; then
 fi
 
 exit "${exit_code}"
-

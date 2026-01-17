@@ -17,8 +17,14 @@ if [[ -z "${callback_url}" || "${callback_url}" == "null" ]]; then
 fi
 
 curl -fsS \
+  --proto =https,http \
+  --proto-redir =https,http \
+  --connect-timeout 5 \
+  --max-time 15 \
+  --retry 3 \
+  --retry-all-errors \
+  --retry-delay 1 \
   -X POST \
   -H "Content-Type: application/json" \
   --data-binary "@${result_file}" \
   "${callback_url}" >/dev/null
-

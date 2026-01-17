@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 180
     steps:
-      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v4
 
       - uses: cachix/install-nix-action@4e002c8ec80594ecd40e759629461e26c8abed15 # v31.9.0
         with:
@@ -72,6 +72,15 @@ jobs:
           loc="${{ inputs.location }}"
           if [[ -z "${loc}" ]]; then loc="nbg1"; fi
 
+          git_ref="${GITHUB_REF_NAME:-unknown}"
+          git_ref_slug="$(
+            printf '%s' "${git_ref}" \
+              | tr '[:upper:]' '[:lower:]' \
+              | sed -E 's/[^a-z0-9_.-]+/-/g; s/^-+//; s/-+$//' \
+              | cut -c1-63
+          )"
+          if [[ -z "${git_ref_slug}" ]]; then git_ref_slug="unknown"; fi
+
           log="$(mktemp -t hcloud-upload-image.XXXXXX.log)"
 
           # Capture full output (contains ANSI). Parse image id from the final success line.
@@ -81,7 +90,7 @@ jobs:
             --architecture x86 \
             --location "${loc}" \
             --description "clawdlets cattle image (${GITHUB_REF_NAME:-${GITHUB_SHA}})" \
-            --labels "managed-by=clawdlets,role=cattle-image,git-ref=${GITHUB_REF_NAME:-unknown},git-sha=${GITHUB_SHA}" \
+            --labels "managed-by=clawdlets,role=cattle-image,git-ref=${git_ref_slug},git-sha=${GITHUB_SHA}" \
             2>&1 | tee "${log}"
           rc="${PIPESTATUS[0]}"
           set -e
@@ -115,6 +124,7 @@ jobs:
 
           cat cattle-image.json
           echo "image_id=${image_id}" >> "$GITHUB_OUTPUT"
+          echo "cattle image id: ${image_id}" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload cattle image metadata artifact
         uses: actions/upload-artifact@v4
