@@ -135,19 +135,21 @@ in
 
     users.groups.clf-bots = { };
     users.groups.clf-orchestrator = { };
-    users.users.clf-orchestrator = {
-      isSystemUser = true;
-      group = "clf-orchestrator";
-      home = "/var/lib/clf/orchestrator";
-      createHome = false;
-      shell = pkgs.bashInteractive;
-    };
-
-    users.users =
-      builtins.listToAttrs (map (b: {
+    users.users = lib.mkMerge [
+      {
+        clf-orchestrator = {
+          isSystemUser = true;
+          group = "clf-orchestrator";
+          home = "/var/lib/clf/orchestrator";
+          createHome = false;
+          shell = pkgs.bashInteractive;
+        };
+      }
+      (builtins.listToAttrs (map (b: {
         name = "bot-${b}";
-        value = { extraGroups = [ "clf-bots" ]; };
-      }) (config.services.clawdbotFleet.bots or [ ]));
+        value = { extraGroups = lib.mkAfter [ "clf-bots" ]; };
+      }) (config.services.clawdbotFleet.bots or [ ])))
+    ];
 
     environment.systemPackages = [ cfg.package ];
 
