@@ -64,11 +64,6 @@ in
       mode = "0755";
     };
 
-    environment.etc."clawdlets/bin/cattle-callback" = {
-      source = ../../../scripts/cattle-callback.sh;
-      mode = "0755";
-    };
-
     environment.systemPackages = [
       clawPkg
       pkgs.bash

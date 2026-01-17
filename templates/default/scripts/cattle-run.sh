@@ -43,8 +43,6 @@ fail() {
     >"${result_file}.tmp"
   mv "${result_file}.tmp" "${result_file}"
 
-  /etc/clawdlets/bin/cattle-callback || true
-
   if [[ "${CLAWDLETS_CATTLE_AUTO_SHUTDOWN:-1}" == "1" ]]; then
     systemctl poweroff || true
   fi
@@ -94,9 +92,15 @@ fetch_secrets_env() {
   local url
   url="${base_url%/}/v1/cattle/env"
 
-  local resp tmp_env
+  local resp tmp_env curl_cfg
   resp="$(mktemp -p /run/clawdlets/cattle clawdlets-cattle.env.XXXXXX.json)"
   tmp_env="$(mktemp -p /run/clawdlets/cattle clawdlets-cattle.env.XXXXXX.sh)"
+  curl_cfg="$(mktemp -p /run/clawdlets/cattle clawdlets-cattle.curl.XXXXXX.conf)"
+  chmod 0400 "${curl_cfg}"
+  local token_escaped
+  token_escaped="${token//\"/\\\"}"
+  printf '%s\n' "header = \"Authorization: Bearer ${token_escaped}\"" >"${curl_cfg}"
+  printf '%s\n' "header = \"Accept: application/json\"" >>"${curl_cfg}"
 
   set +e
   curl -fsS \
@@ -105,12 +109,12 @@ fetch_secrets_env() {
     --retry 5 \
     --retry-all-errors \
     --retry-delay 1 \
-    -H "Authorization: Bearer ${token}" \
-    -H "Accept: application/json" \
+    --config "${curl_cfg}" \
     "${url}" \
     -o "${resp}"
   local rc="$?"
   set -e
+  rm -f "${curl_cfg}" || true
 
   if [[ "${rc}" != "0" ]]; then
     rm -f "${resp}" "${tmp_env}" || true
@@ -246,8 +250,6 @@ jq -n \
   '{status:$status,task:{id:$taskId,type:$type},startedAt:$startedAt,finishedAt:$finishedAt,exitCode:$exitCode,paths:{taskFile:$taskFile,resultFile:$resultFile,gatewayLog:$gatewayLog,agentLog:$agentLog}}' \
   >"${result_file}.tmp"
 mv "${result_file}.tmp" "${result_file}"
-
-/etc/clawdlets/bin/cattle-callback || true
 
 if [[ "${CLAWDLETS_CATTLE_AUTO_SHUTDOWN:-1}" == "1" ]]; then
   systemctl poweroff || true
